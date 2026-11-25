@@ -322,7 +322,11 @@ export class LogUpdate {
       // user scrolls up to (the whale-logo / duplicated-transcript
       // reports).
       const scrollbackRows = Math.max(
-        0,
+        // The pad from an earlier anchored repaint is already-established
+        // scrollback that the height formula cannot see: recomputing from the
+        // heights alone undercounts it, and the drift compounds on every
+        // subsequent round (#1934). Take the deeper of the two.
+        this.state.anchoredPad,
         Math.max(prev.screen.height, next.screen.height) -
           next.viewport.height +
           (prevHadScrollback ? 1 : 0),
@@ -393,7 +397,9 @@ export class LogUpdate {
         // reprinted the whole frame, duplicating the scrollback rows
         // (whale-logo / duplicated-transcript reports).
         const scrollbackRows = Math.max(
-          0,
+          // Same floor as the branch above: the anchored pad already counts
+          // rows the height formula no longer sees (#1934).
+          this.state.anchoredPad,
           prev.screen.height - prev.viewport.height + cursorRestoreScroll,
         )
         const { patches, anchoredPad } = shrinkAnchoredRepaint(
@@ -413,6 +419,10 @@ export class LogUpdate {
       // If we need to clear more lines than fit in the viewport, some are in
       // scrollback, so we need a full reset.
       if (linesToClear > prev.viewport.height) {
+        // A reset re-lays the frame from the viewport origin, so the pad
+        // established by an earlier anchored repaint is void — keeping it
+        // would hide reachable rows from the next sparse diff (#1934).
+        this.state.anchoredPad = 0
         return fullResetSequence_CAUSES_FLICKER(
           next,
           'offscreen',
